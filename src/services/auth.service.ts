@@ -78,11 +78,9 @@ export const validateUserCredentials = async (
 
     const basicUserInfo = authRecordsets[1]?.[0];
 
-    // ==========================================================
-    // SỬA LỖI TẠI ĐÂY: Lấy đúng cột `UserId` thay vì `ObjectId`
-    // ==========================================================
+
     const userId = basicUserInfo.UserId;
-    // ==========================================================
+
 
     if (!userId) {
       // Kiểm tra xem userId có tồn tại không

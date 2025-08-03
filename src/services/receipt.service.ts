@@ -16,19 +16,16 @@ export const findReceiptByCode = async (
   try {
     const request = pool.request();
 
-    // Truyền các tham số cho Stored Procedure
     request.input("BranchID", sql.BigInt, branchId);
-    request.input("CustomerName", sql.NVarChar(100), ""); // Để trống theo yêu cầu
-    request.input("TicketSerialCode", sql.VarChar(30), ""); // Để trống
+    request.input("CustomerName", sql.NVarChar(100), "");
+    request.input("TicketSerialCode", sql.VarChar(30), "");
     request.input("TicketIssuedDate", sql.Date, searchDate);
-    request.input("TicketStatus", sql.TinyInt, 0); // Lấy tất cả trạng thái
+    request.input("TicketStatus", sql.TinyInt, 0);
     request.input("TicketCode", sql.VarChar(30), ticketCode);
-    request.input("TourID", sql.VarChar(100), null); // Để null
+    request.input("TourID", sql.VarChar(100), null);
 
     const result = await request.execute("sp_Pos_SearchTicketCodeCheckInOut");
 
-    // SP này có thể trả về một recordset chứa danh sách các vé phù hợp
-    // Chúng ta trả về toàn bộ danh sách
     return result.recordset || [];
   } catch (error) {
     console.error("Error in findReceiptByCode service:", error);
