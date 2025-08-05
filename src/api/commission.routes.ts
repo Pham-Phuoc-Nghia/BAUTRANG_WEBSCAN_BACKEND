@@ -1,55 +1,49 @@
+// src/routes/commission.routes.ts
+
 import { Router } from "express";
 import { protect } from "../middleware/auth.middleware";
-import { 
-    saveBatchHandler,
-    getReportHandler,
-    createPayoutHandler,
-    getServiceCategoriesHandler,
-    getRulesHandler,
-    saveRuleHandler,
-    deleteRuleHandler 
+import {
+  // Handlers cho Cài đặt
+  getRulesHandler,
+  saveRuleHandler,
+  deleteRuleHandler,
+  getCategoriesHandler,
+  saveCategoryHandler,
+  deleteCategoryHandler,
+  // Handlers cho Ghi nhận Bill
+  createUnifiedBillHandler,
+  // Handlers cho Báo cáo
+  getReportHandler,
+  updateTransactionHandler,
+  deleteTransactionHandler,
+  // Handlers khác
+  createPayoutHandler,
 } from "../controllers/commission.controller";
 
 const router = Router();
-
-// Tất cả các route trong file này đều cần xác thực
 router.use(protect);
 
-/**
- * @route   POST /api/commissions/batch
- * @desc    Lưu một loạt giao dịch hoa hồng từ một phiên nhập liệu
- * @access  Private
- */
-router.post("/batch", saveBatchHandler);
+// === QUẢN LÝ CÀI ĐẶT (SETTINGS) ===
+router.route("/rules").get(getRulesHandler).post(saveRuleHandler);
+router.route("/rules/:id").put(saveRuleHandler).delete(deleteRuleHandler);
 
-/**
- * @route   GET /api/commissions/report
- * @desc    Lấy báo cáo các giao dịch hoa hồng
- * @access  Private
- */
+router.route("/categories").get(getCategoriesHandler).post(saveCategoryHandler);
+router
+  .route("/categories/:id")
+  .put(saveCategoryHandler)
+  .delete(deleteCategoryHandler);
+
+// === GHI NHẬN HOA HỒNG (LOGIC MỚI HỢP NHẤT) ===
+router.post("/unified-bill", createUnifiedBillHandler);
+
+// === BÁO CÁO & ĐỐI SOÁT ===
 router.get("/report", getReportHandler);
+router
+  .route("/transactions/:id")
+  .put(updateTransactionHandler)
+  .delete(deleteTransactionHandler);
 
-/**
- * @route   POST /api/commissions/payouts
- * @desc    Tạo một phiếu chi thanh toán
- * @access  Private
- */
+// === CHỨC NĂNG KHÁC ===
 router.post("/payouts", createPayoutHandler);
-
-/**
- * @route   GET /api/commissions/service-categories
- * @desc    Lấy danh sách các loại dịch vụ
- * @access  Private
- */
-router.get("/service-categories", getServiceCategoriesHandler);
-
-/**
- * @route   GET /api/commissions/rules
- * @desc    Lấy danh sách quy tắc hoa hồng
- * @access  Private
- */
-router.get("/rules", getRulesHandler);
-router.post("/rules", saveRuleHandler);
-router.delete("/rules/:id", deleteRuleHandler);
 
 export default router;
