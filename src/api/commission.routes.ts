@@ -1,5 +1,3 @@
-// src/routes/commission.routes.ts
-
 import { Router } from "express";
 import { protect } from "../middleware/auth.middleware";
 import {
@@ -10,15 +8,20 @@ import {
   getCategoriesHandler,
   saveCategoryHandler,
   deleteCategoryHandler,
-  // Handlers cho Ghi nhận Bill
-  createUnifiedBillHandler,
-  getBillForPrintingHandler, // THÊM MỚI: Handler để in phiếu
-  // Handlers cho Báo cáo
+
+  // Handlers cho Đối tác
+  getPartnerByPhoneHandler,
+
+  // Handlers cho Bill (Lưu, Lấy để sửa, Lấy để in, Xóa)
+  saveUnifiedBillHandler, // <-- Dùng chung cho Create & Update
+  getBillForPrintingHandler,
+  getFullBillForEditingHandler,
+  deleteFullBillHandler,
+
+  // Handlers cho Báo cáo (Transactions riêng lẻ)
   getReportHandler,
   updateTransactionHandler,
   deleteTransactionHandler,
-  // Handlers cho Đối tác
-  getPartnerByPhoneHandler, // THÊM MỚI: Handler để lấy thông tin đối tác
 } from "../controllers/commission.controller";
 
 const router = Router();
@@ -35,23 +38,26 @@ router
   .delete(deleteCategoryHandler);
 
 // === QUẢN LÝ ĐỐI TÁC (PARTNERS) ===
-// THÊM MỚI: Lấy thông tin đối tác theo SĐT để tự động điền tên
 router.get("/partners/by-phone/:phone", getPartnerByPhoneHandler);
 
-// === GHI NHẬN & IN PHIẾU HOA HỒNG ===
-// Ghi nhận bill hợp nhất
-router.post("/unified-bill", createUnifiedBillHandler);
-// Lấy dữ liệu của 1 bill để in
+// === GHI NHẬN & CHỈNH SỬA PHIẾU HOA HỒNG (BILL MASTER) ===
+// Endpoint này giờ dùng cho cả CREATE và UPDATE
+router.post("/unified-bill", saveUnifiedBillHandler);
+
+// Endpoint LẤY DỮ LIỆU của 1 bill để SỬA
+router.get("/unified-bill/:id/for-editing", getFullBillForEditingHandler);
+
+// Endpoint LẤY DỮ LIỆU của 1 bill để IN
 router.get("/unified-bill/:id/for-print", getBillForPrintingHandler);
 
-// === BÁO CÁO & ĐỐI SOÁT ===
+// Endpoint XÓA một bill hoàn chỉnh
+router.delete("/unified-bill/:id", deleteFullBillHandler);
+
+// === BÁO CÁO & ĐỐI SOÁT (TRANSACTIONS) ===
 router.get("/report", getReportHandler);
 router
   .route("/transactions/:id")
   .put(updateTransactionHandler)
   .delete(deleteTransactionHandler);
-
-// === CÁC ROUTE ĐÃ BỊ XÓA ===
-// router.post("/payouts", createPayoutHandler); // XÓA: Chức năng thanh toán đã bị loại bỏ
 
 export default router;

@@ -9,10 +9,12 @@ import {
   ICategoryPayload,
   IPartner,
   IPrintBillPayload,
+  IFullBillForEditing,
 } from "../types/commission.types";
 
-// ... (các hàm khác giữ nguyên)
-
+// =========================================================================
+// QUẢN LÝ CÀI ĐẶT (SETTINGS)
+// =========================================================================
 export const manageSettingsApi = async (
   action:
     | "GetRuleList"
@@ -54,9 +56,10 @@ export const manageSettingsApi = async (
 
     const result = await request.execute("proc_COMMISSION_ManageRule");
 
-    if (!result || !result.recordset) {
-      throw new Error("Không nhận được phản hồi từ cơ sở dữ liệu.");
+    if (!result.recordset) {
+      throw new Error("Không có dữ liệu trả về từ stored procedure.");
     }
+
     return action.includes("List") ? result.recordset : result.recordset[0];
   } catch (error) {
     console.error(
@@ -67,6 +70,9 @@ export const manageSettingsApi = async (
   }
 };
 
+// =========================================================================
+// QUẢN LÝ ĐỐI TÁC (PARTNERS)
+// =========================================================================
 export const getPartnerByPhone = async (
   phone: string
 ): Promise<IPartner | null> => {
@@ -81,32 +87,78 @@ export const getPartnerByPhone = async (
   }
 };
 
+// =========================================================================
+// QUẢN LÝ BILL (GET FOR EDIT/DELETE)
+// =========================================================================
+export const manageBillMaster = async (
+  action: "GetForEditing" | "Delete",
+  billId: number,
+  userId?: number // Required for 'Delete'
+): Promise<IFullBillForEditing | any> => {
+  try {
+    const request = pool.request();
+    request.input("Action", sql.NVarChar(50), action);
+    request.input("BillMasterID", sql.Int, billId);
+    if (userId) {
+      request.input("UserID", sql.Int, userId);
+    }
+
+    const result = await request.execute("proc_COMMISSION_ManageBillMaster");
+
+    if (action === "GetForEditing") {
+      if (
+        !result.recordsets ||
+        !Array.isArray(result.recordsets) ||
+        result.recordsets.length < 3
+      ) {
+        throw new Error("Dữ liệu bill để chỉnh sửa không hợp lệ.");
+      }
+      const billData: IFullBillForEditing = {
+        billInfo: result.recordsets[0][0],
+        services: result.recordsets[1],
+        beneficiaries: result.recordsets[2],
+      };
+      return billData;
+    }
+
+    // For 'Delete' action
+    if (!result.recordset) {
+      throw new Error("Không có phản hồi khi xóa bill.");
+    }
+    return result.recordset[0];
+  } catch (error) {
+    console.error(
+      `Lỗi trong service manageBillMaster với action ${action}:`,
+      error
+    );
+    throw error;
+  }
+};
+
+// =========================================================================
+// XỬ LÝ LƯU BILL (CREATE & UPDATE)
+// =========================================================================
 export const saveUnifiedBill = async (
   payload: IUnifiedBillPayload,
   userId: number
 ) => {
   try {
-    // 1. TẠO UDT CHO DANH SÁCH DỊCH VỤ (CÓ THAY ĐỔI TẠI ĐÂY)
     const serviceTable = new sql.Table("udt_CommissionBillDetails");
-    // Khai báo các cột khớp với Type mới trong DB
     serviceTable.columns.add("RuleID", sql.Int);
-    serviceTable.columns.add("RuleName", sql.NVarChar(255)); // << THÊM CỘT MỚI
+    serviceTable.columns.add("RuleName", sql.NVarChar(255));
     serviceTable.columns.add("Quantity", sql.Int);
     serviceTable.columns.add("BaseAmount", sql.Decimal(18, 2));
     serviceTable.columns.add("CommissionAmount", sql.Decimal(18, 2));
-
-    // Thêm dữ liệu vào các hàng
     for (const service of payload.serviceList) {
       serviceTable.rows.add(
         service.ruleId,
-        service.ruleName, // << TRUYỀN DỮ LIỆU ruleName TỪ PAYLOAD
+        service.ruleName,
         service.quantity,
         service.baseAmount || null,
         service.commissionAmount
       );
     }
 
-    // 2. TẠO UDT CHO DANH SÁCH NGƯỜI HƯỞNG (KHÔNG ĐỔI)
     const beneficiaryTable = new sql.Table("udt_CommissionSplitBeneficiary");
     beneficiaryTable.columns.add("PartnerName", sql.NVarChar(255));
     beneficiaryTable.columns.add("PartnerPhone", sql.VarChar(20));
@@ -121,8 +173,8 @@ export const saveUnifiedBill = async (
       );
     }
 
-    // 3. GỌI STORED PROCEDURE (KHÔNG ĐỔI)
     const request = pool.request();
+    request.input("BillMasterID", sql.Int, payload.billMasterId || null);
     request.input("CustomerInfo", sql.NVarChar(255), payload.customerInfo);
     request.input(
       "TotalCommissionAmount",
@@ -131,7 +183,7 @@ export const saveUnifiedBill = async (
     );
     request.input("Notes", sql.NVarChar(500), payload.notes || null);
     request.input("CreatedByUserID", sql.Int, userId);
-    request.input("ServiceList", serviceTable); // Truyền TVP dịch vụ đã có cấu trúc mới
+    request.input("ServiceList", serviceTable);
     request.input("BeneficiaryList", beneficiaryTable);
 
     const result = await request.execute("proc_COMMISSION_SaveUnifiedBill");
@@ -147,7 +199,10 @@ export const saveUnifiedBill = async (
     throw error;
   }
 };
-// THÊM MỚI: Service để lấy dữ liệu cho việc in phiếu
+
+// =========================================================================
+// BÁO CÁO VÀ GIAO DỊCH CON
+// =========================================================================
 export const getBillForPrinting = async (
   billId: number
 ): Promise<IPrintBillPayload> => {
@@ -155,8 +210,6 @@ export const getBillForPrinting = async (
     const request = pool.request();
     request.input("BillMasterID", sql.Int, billId);
     const result = await request.execute("proc_COMMISSION_GetBillForPrinting");
-
-    // FIX: Thêm điều kiện Array.isArray để giúp TypeScript hiểu kiểu dữ liệu
     if (
       !result.recordsets ||
       !Array.isArray(result.recordsets) ||
@@ -164,14 +217,11 @@ export const getBillForPrinting = async (
     ) {
       throw new Error("Dữ liệu trả về để in không hợp lệ.");
     }
-
-    // Giờ đây TypeScript đã biết result.recordsets là một mảng và cho phép truy cập
     const printData: IPrintBillPayload = {
       billInfo: result.recordsets[0][0],
       services: result.recordsets[1],
       beneficiaries: result.recordsets[2],
     };
-
     return printData;
   } catch (error) {
     console.error("Lỗi trong service getBillForPrinting:", error);
@@ -210,7 +260,6 @@ export const manageCommissionTransaction = async (
     request.input("Action", sql.NVarChar(20), action);
     request.input("TransactionID", sql.Int, transactionId);
     request.input("UserID", sql.Int, userId);
-
     if (action === "Update" && payload) {
       request.input("PartnerName", sql.NVarChar(255), payload.PartnerName);
       request.input("PartnerPhone", sql.VarChar(20), payload.PartnerPhone);
@@ -225,7 +274,6 @@ export const manageCommissionTransaction = async (
         payload.CommissionAmount
       );
     }
-
     const result = await request.execute("proc_COMMISSION_ManageTransaction");
     return result.recordset[0];
   } catch (error) {

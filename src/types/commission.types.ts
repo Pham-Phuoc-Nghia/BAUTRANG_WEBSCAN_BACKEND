@@ -61,16 +61,39 @@ export interface IUnifiedBeneficiaryPayload {
 
 /** Payload hoàn chỉnh cho API tạo bill hợp nhất */
 export interface IUnifiedBillPayload {
+  billMasterId?: number;
   customerInfo: string;
   notes?: string;
   totalCommissionAmount: number;
-  serviceList: IUnifiedServicePayload[]; // <-- Interface này đã được cập nhật
+  serviceList: IUnifiedServicePayload[];
   beneficiaryList: IUnifiedBeneficiaryPayload[];
 }
 // ===================================================================
 // ================ SECTION: NEW TYPES FOR NEW FEATURES ==============
 // ===================================================================
-
+/**
+ * Cấu trúc dữ liệu đầy đủ của một Bill khi lấy về để chỉnh sửa
+ */
+export interface IFullBillForEditing {
+  billInfo: {
+    BillMasterID: number;
+    CustomerInfo: string;
+    Notes: string;
+  };
+  services: {
+    RuleID: number;
+    CalculationType: 1 | 2; // Giúp frontend xác định cách hiển thị
+    Quantity: number;
+    BaseAmount: number | null;
+    CommissionAmount: number;
+  }[];
+  beneficiaries: {
+    PartnerName: string;
+    PartnerPhone: string;
+    PartnerLicensePlate: string | null;
+    CommissionAmount: number;
+  }[];
+}
 /**
  * Cấu trúc dữ liệu của một đối tác
  */

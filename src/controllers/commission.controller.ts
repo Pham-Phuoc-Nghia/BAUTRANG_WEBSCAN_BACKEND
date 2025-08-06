@@ -11,17 +11,14 @@ import {
 
 // ================== QUẢN LÝ CÀI ĐẶT (SETTINGS) ==================
 
-// ---- RULES ----
 export const getRulesHandler: RequestHandler = async (req, res) => {
   try {
     const categoryId = req.query.categoryId
       ? parseInt(req.query.categoryId as string)
       : undefined;
-    const payload = { CategoryID: categoryId };
-    const result = await commissionService.manageSettingsApi(
-      "GetRuleList",
-      payload
-    );
+    const result = await commissionService.manageSettingsApi("GetRuleList", {
+      CategoryID: categoryId,
+    });
     res.status(200).json(result);
   } catch (error: any) {
     res.status(500).json({ message: "Lỗi", detail: error.message });
@@ -33,7 +30,7 @@ export const saveRuleHandler: RequestHandler = async (req, res) => {
     const userId = (req as any).user?.UserId;
     if (!userId) {
       res.status(403).json({ message: "Forbidden" });
-      return; // FIX: Chỉ cần return, không return res.json()
+      return;
     }
     const ruleId = req.params.id ? parseInt(req.params.id) : undefined;
     const payload: Partial<IRulePayload> = {
@@ -56,12 +53,12 @@ export const deleteRuleHandler: RequestHandler = async (req, res) => {
     const userId = (req as any).user?.UserId;
     if (!userId) {
       res.status(403).json({ message: "Forbidden" });
-      return; // FIX
+      return;
     }
     const ruleId = parseInt(req.params.id);
     if (!ruleId) {
       res.status(400).json({ message: "Rule ID là bắt buộc." });
-      return; // FIX
+      return;
     }
     const payload = { RuleID: ruleId, UserID: userId };
     const result = await commissionService.manageSettingsApi(
@@ -74,7 +71,6 @@ export const deleteRuleHandler: RequestHandler = async (req, res) => {
   }
 };
 
-// ---- CATEGORIES ----
 export const getCategoriesHandler: RequestHandler = async (req, res) => {
   try {
     const result = await commissionService.manageSettingsApi(
@@ -92,7 +88,7 @@ export const saveCategoryHandler: RequestHandler = async (req, res) => {
     const userId = (req as any).user?.UserId;
     if (!userId) {
       res.status(403).json({ message: "Forbidden" });
-      return; // FIX
+      return;
     }
     const categoryId = req.params.id ? parseInt(req.params.id) : undefined;
     const payload: Partial<ICategoryPayload> = {
@@ -115,12 +111,12 @@ export const deleteCategoryHandler: RequestHandler = async (req, res) => {
     const userId = (req as any).user?.UserId;
     if (!userId) {
       res.status(403).json({ message: "Forbidden" });
-      return; // FIX
+      return;
     }
     const categoryId = parseInt(req.params.id);
     if (!categoryId) {
       res.status(400).json({ message: "Category ID là bắt buộc." });
-      return; // FIX
+      return;
     }
     const payload = { CategoryID: categoryId, UserID: userId };
     const result = await commissionService.manageSettingsApi(
@@ -139,7 +135,7 @@ export const getPartnerByPhoneHandler: RequestHandler = async (req, res) => {
     const { phone } = req.params;
     if (!phone) {
       res.status(400).json({ message: "Số điện thoại là bắt buộc." });
-      return; // FIX
+      return;
     }
     const partner = await commissionService.getPartnerByPhone(phone);
     if (partner) {
@@ -152,44 +148,86 @@ export const getPartnerByPhoneHandler: RequestHandler = async (req, res) => {
   }
 };
 
-// ================== GHI NHẬN & IN PHIẾU ==================
-// ================== GHI NHẬN & IN PHIẾU ==================
-export const createUnifiedBillHandler: RequestHandler = async (
-  req: Request,
-  res: Response
-) => {
+// ================== GHI NHẬN, SỬA, XÓA, IN PHIẾU ==================
+export const saveUnifiedBillHandler: RequestHandler = async (req, res) => {
   try {
     const userId = (req as any).user?.UserId;
     if (!userId) {
       res.status(403).json({ message: "Forbidden: User ID không hợp lệ." });
       return;
     }
-    // Payload nhận từ req.body giờ đây đã bao gồm `ruleName` trong mỗi phần tử của serviceList
     const payload: IUnifiedBillPayload = req.body;
-
-    // Các bước kiểm tra vẫn như cũ
     if (
       !payload.serviceList ||
       payload.serviceList.length === 0 ||
       !payload.beneficiaryList ||
       payload.beneficiaryList.length === 0
     ) {
-      res.status(400).json({
-        message: "Danh sách dịch vụ và người hưởng không được để trống.",
-      });
+      res
+        .status(400)
+        .json({
+          message: "Danh sách dịch vụ và người hưởng không được để trống.",
+        });
       return;
     }
-
-    // Chuyển payload tới service, service sẽ tự xử lý dữ liệu mới
     const result = await commissionService.saveUnifiedBill(payload, userId);
-    res.status((result as any).Code || 201).json(result);
+    res.status((result as any).Code || 200).json(result);
   } catch (error: any) {
     const errorMessage =
       (error as any).originalError?.info?.message || (error as Error).message;
-    res.status(500).json({
-      message: "Lỗi máy chủ nội bộ khi ghi nhận bill.",
-      detail: errorMessage,
-    });
+    res
+      .status(500)
+      .json({ message: "Lỗi khi xử lý bill.", detail: errorMessage });
+  }
+};
+
+export const getFullBillForEditingHandler: RequestHandler = async (
+  req,
+  res
+) => {
+  try {
+    const billId = parseInt(req.params.id);
+    if (!billId) {
+      res.status(400).json({ message: "Bill ID là bắt buộc." });
+      return;
+    }
+    const billData = await commissionService.manageBillMaster(
+      "GetForEditing",
+      billId
+    );
+    res.status(200).json(billData);
+  } catch (error: any) {
+    res
+      .status(500)
+      .json({
+        message: "Lỗi máy chủ khi lấy dữ liệu bill",
+        detail: error.message,
+      });
+  }
+};
+
+export const deleteFullBillHandler: RequestHandler = async (req, res) => {
+  try {
+    const userId = (req as any).user?.UserId;
+    if (!userId) {
+      res.status(403).json({ message: "Forbidden" });
+      return;
+    }
+    const billId = parseInt(req.params.id);
+    if (!billId) {
+      res.status(400).json({ message: "Bill ID là bắt buộc." });
+      return;
+    }
+    const result = await commissionService.manageBillMaster(
+      "Delete",
+      billId,
+      userId
+    );
+    res.status((result as any).Code || 200).json(result);
+  } catch (error: any) {
+    res
+      .status(500)
+      .json({ message: "Lỗi máy chủ khi xóa bill", detail: error.message });
   }
 };
 
@@ -198,7 +236,7 @@ export const getBillForPrintingHandler: RequestHandler = async (req, res) => {
     const billId = parseInt(req.params.id);
     if (!billId) {
       res.status(400).json({ message: "Bill ID là bắt buộc." });
-      return; // FIX
+      return;
     }
     const printData = await commissionService.getBillForPrinting(billId);
     res.status(200).json(printData);
@@ -208,15 +246,12 @@ export const getBillForPrintingHandler: RequestHandler = async (req, res) => {
 };
 
 // ================== BÁO CÁO & ĐỐI SOÁT (TRANSACTIONS) ==================
-export const getReportHandler: RequestHandler = async (
-  req: Request,
-  res: Response
-) => {
+export const getReportHandler: RequestHandler = async (req, res) => {
   try {
     const { fromDate, toDate, partnerPhone } = req.query;
     if (!fromDate || !toDate) {
       res.status(400).json({ message: "fromDate và toDate là bắt buộc." });
-      return; // FIX
+      return;
     }
     const transactions = await commissionService.getCommissionTransactions(
       fromDate as string,
@@ -231,20 +266,17 @@ export const getReportHandler: RequestHandler = async (
   }
 };
 
-export const updateTransactionHandler: RequestHandler = async (
-  req: Request,
-  res: Response
-) => {
+export const updateTransactionHandler: RequestHandler = async (req, res) => {
   try {
     const userId = (req as any).user?.UserId;
     if (!userId) {
       res.status(403).json({ message: "Forbidden: User ID không hợp lệ." });
-      return; // FIX
+      return;
     }
     const transactionId = parseInt(req.params.id);
     if (!transactionId) {
       res.status(400).json({ message: "Transaction ID là bắt buộc." });
-      return; // FIX
+      return;
     }
     const payload: ITransactionUpdatePayload = req.body;
     const result = await commissionService.manageCommissionTransaction(
@@ -261,20 +293,17 @@ export const updateTransactionHandler: RequestHandler = async (
   }
 };
 
-export const deleteTransactionHandler: RequestHandler = async (
-  req: Request,
-  res: Response
-) => {
+export const deleteTransactionHandler: RequestHandler = async (req, res) => {
   try {
     const userId = (req as any).user?.UserId;
     if (!userId) {
       res.status(403).json({ message: "Forbidden: User ID không hợp lệ." });
-      return; // FIX
+      return;
     }
     const transactionId = parseInt(req.params.id);
     if (!transactionId) {
       res.status(400).json({ message: "Transaction ID là bắt buộc." });
-      return; // FIX
+      return;
     }
     const result = await commissionService.manageCommissionTransaction(
       "Delete",
