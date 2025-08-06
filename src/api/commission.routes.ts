@@ -12,12 +12,13 @@ import {
   deleteCategoryHandler,
   // Handlers cho Ghi nhận Bill
   createUnifiedBillHandler,
+  getBillForPrintingHandler, // THÊM MỚI: Handler để in phiếu
   // Handlers cho Báo cáo
   getReportHandler,
   updateTransactionHandler,
   deleteTransactionHandler,
-  // Handlers khác
-  createPayoutHandler,
+  // Handlers cho Đối tác
+  getPartnerByPhoneHandler, // THÊM MỚI: Handler để lấy thông tin đối tác
 } from "../controllers/commission.controller";
 
 const router = Router();
@@ -33,8 +34,15 @@ router
   .put(saveCategoryHandler)
   .delete(deleteCategoryHandler);
 
-// === GHI NHẬN HOA HỒNG (LOGIC MỚI HỢP NHẤT) ===
+// === QUẢN LÝ ĐỐI TÁC (PARTNERS) ===
+// THÊM MỚI: Lấy thông tin đối tác theo SĐT để tự động điền tên
+router.get("/partners/by-phone/:phone", getPartnerByPhoneHandler);
+
+// === GHI NHẬN & IN PHIẾU HOA HỒNG ===
+// Ghi nhận bill hợp nhất
 router.post("/unified-bill", createUnifiedBillHandler);
+// Lấy dữ liệu của 1 bill để in
+router.get("/unified-bill/:id/for-print", getBillForPrintingHandler);
 
 // === BÁO CÁO & ĐỐI SOÁT ===
 router.get("/report", getReportHandler);
@@ -43,7 +51,7 @@ router
   .put(updateTransactionHandler)
   .delete(deleteTransactionHandler);
 
-// === CHỨC NĂNG KHÁC ===
-router.post("/payouts", createPayoutHandler);
+// === CÁC ROUTE ĐÃ BỊ XÓA ===
+// router.post("/payouts", createPayoutHandler); // XÓA: Chức năng thanh toán đã bị loại bỏ
 
 export default router;
