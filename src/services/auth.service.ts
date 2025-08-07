@@ -11,16 +11,15 @@ interface IAuthResult {
 }
 
 /**
- * Hàm Lấy thông tin chi tiết của user bằng UserId và BranchId.
- * Hàm này được giữ nguyên, không thay đổi.
+ * Lấy thông tin chi tiết của user bằng UserId.
+ * Hàm này không thay đổi.
  */
-const getUserDetails = async (userId: number, branchId: number) => {
+export const getUserDetails = async (userId: number): Promise<any | null> => {
   try {
     const request = pool.request();
     request.input("UserId", sql.Int, userId);
-    request.input("OrgId", sql.Int, branchId);
 
-    const result = await request.execute("proc_Auth_GetUserInfoLogin");
+    const result = await request.execute("proc_SCAN_Auth_GetUserInfoLogin");
     const recordsets = result.recordsets as sql.IRecordSet<any>[];
 
     const userInfo = recordsets[0]?.[0];
@@ -43,8 +42,8 @@ const getUserDetails = async (userId: number, branchId: number) => {
 };
 
 /**
- * Hàm xác thực thông tin đăng nhập đã được KHÔI PHỤC LOGIC ĐÚNG.
- * Xử lý 2 recordsets trả về từ `proc_SCAN_Auth_LoginClient`.
+ * Hàm xác thực thông tin đăng nhập.
+ * Đã sửa lỗi: Gắn lại `UserId` vào kết quả cuối cùng.
  */
 export const validateUserCredentials = async (
   username: string,
@@ -52,11 +51,6 @@ export const validateUserCredentials = async (
   branchId: number
 ): Promise<IAuthResult> => {
   try {
-    console.log(`\n--- BẮT ĐẦU YÊU CẦU ĐĂNG NHẬP (ĐÃ SỬA LỖI ID) ---`);
-    console.log(
-      `[1] Dữ liệu nhận được: username=${username}, password=***, branchId=${branchId}`
-    );
-
     const authRequest = pool.request();
     authRequest.input("UserName", sql.VarChar(20), username);
     authRequest.input("PassWord", sql.VarChar(20), password);
@@ -64,8 +58,6 @@ export const validateUserCredentials = async (
       "proc_SCAN_Auth_LoginClient"
     );
     const authRecordsets = authResultSp.recordsets as sql.IRecordSet<any>[];
-
-    console.log("[2] Kết quả từ proc_SCAN_Auth_LoginClient:", authRecordsets);
 
     const statusResponse = authRecordsets[0]?.[0];
     if (!statusResponse || !statusResponse.Success) {
@@ -78,12 +70,10 @@ export const validateUserCredentials = async (
 
     const basicUserInfo = authRecordsets[1]?.[0];
 
-
-    const userId = basicUserInfo.UserId;
-
+    // Bước 1: Tìm thấy `userId` từ SP đầu tiên
+    const userId = basicUserInfo?.UserId;
 
     if (!userId) {
-      // Kiểm tra xem userId có tồn tại không
       console.error("[LỖI] Xác thực thành công nhưng không tìm thấy UserId.");
       return {
         isValid: false,
@@ -92,10 +82,8 @@ export const validateUserCredentials = async (
       };
     }
 
-    console.log(`[3] Lấy được UserId: ${userId}. Chuẩn bị gọi SP thứ hai.`); // Bây giờ sẽ log ra số 1
-
-    const fullUserObject = await getUserDetails(userId, branchId);
-    console.log("[4] Kết quả từ proc_Auth_GetUserInfoLogin:", fullUserObject);
+    // Bước 2: Dùng `userId` để lấy thông tin chi tiết
+    const fullUserObject = await getUserDetails(userId);
 
     if (!fullUserObject) {
       console.error(
@@ -109,13 +97,14 @@ export const validateUserCredentials = async (
       };
     }
 
-    console.log(`[5] Đăng nhập thành công! Trả về full user object.`);
-    console.log(`--- KẾT THÚC YÊU CẦU ĐĂNG NHẬP ---\n`);
+    // Bước 3 (QUAN TRỌNG): Gắn lại `userId` vào object cuối cùng
+    // vì `getUserDetails` không trả về trường này.
+    fullUserObject.UserId = userId;
 
     return {
       isValid: true,
       message: "Đăng nhập thành công",
-      user: fullUserObject,
+      user: fullUserObject, // Bây giờ object này chắc chắn có `UserId`
     };
   } catch (error) {
     console.error(
